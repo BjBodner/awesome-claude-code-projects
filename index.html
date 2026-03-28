@@ -445,23 +445,19 @@
       const ctx = canvas.getContext('2d');
       let W, H;
       let mouseX = -9999, mouseY = -9999;
-      const BOID_COUNT = 450;
+      const BOID_COUNT = 250;
       const FLEE_RADIUS = 140;
       const FLEE_STRENGTH = 1.8;
       const MAX_SPEED = 0.9;
       const MIN_SPEED = 0.2;
       const WANDER_STRENGTH = 0.02;
 
-      // Flocking params — tuned so boids flock locally but don't all merge
+      // Flocking params
       const VISUAL_RANGE = 120;
       const SEP_DIST = 20;
       const COHESION = 0.004;
       const ALIGNMENT = 0.06;
       const SEPARATION = 0.05;
-
-      // Zone tether — each boid has a "home" Y band it drifts back toward
-      const ZONE_PULL = 0.0008;      // gentle pull back to home zone
-      const ZONE_DRIFT = 300;        // allowed wander distance from home
 
       // Generate a unique color per boid — themed HSL
       function randomBoidColor() {
@@ -479,37 +475,16 @@
         return `hsla(${hue}, ${sat}%, ${lit}%, ${alpha})`;
       }
 
-      function redistributeHomes() {
-        // Spread boid home zones evenly across current page height
-        for (let i = 0; i < boids.length; i++) {
-          boids[i].homeY = (i / boids.length) * H + (Math.random() - 0.5) * (H / boids.length) * 2;
-        }
-      }
-
       function resize() {
         W = canvas.width = window.innerWidth;
-        H = canvas.height = document.documentElement.scrollHeight;
-        if (boids.length > 0) redistributeHomes();
+        H = canvas.height = window.innerHeight;
       }
       window.addEventListener('resize', resize);
       resize();
 
-      // Recalculate canvas height on scroll (for dynamic content)
-      let resizeTimer;
-      window.addEventListener('scroll', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          const newH = document.documentElement.scrollHeight;
-          if (Math.abs(newH - H) > 50) {
-            H = canvas.height = newH;
-            redistributeHomes();
-          }
-        }, 200);
-      });
-
       document.addEventListener('mousemove', (e) => {
         mouseX = e.clientX;
-        mouseY = e.clientY + window.scrollY;
+        mouseY = e.clientY;
       });
       document.addEventListener('mouseleave', () => {
         mouseX = -9999;
@@ -517,21 +492,15 @@
       });
 
       class Boid {
-        constructor(index, total) {
+        constructor() {
           this.x = Math.random() * W;
-          // Distribute evenly across the full page height
-          this.homeY = (index / total) * H + (Math.random() - 0.5) * (H / total) * 2;
-          this.y = this.homeY + (Math.random() - 0.5) * ZONE_DRIFT;
+          this.y = Math.random() * H;
           this.vx = (Math.random() - 0.5) * MAX_SPEED * 2;
           this.vy = (Math.random() - 0.5) * MAX_SPEED * 2;
-          // Wider size range — from tiny specks to chunky dots
           this.size = 1.5 + Math.random() * 4.5;
-          // Each boid gets its own unique color
           this.color = randomBoidColor();
-          // Gentle wander angle — drifts slowly for organic movement
           this.wanderAngle = Math.random() * Math.PI * 2;
           this.wanderRate = 0.08 + Math.random() * 0.15;
-          // Slight per-boid speed variation
           this.speedMult = 0.85 + Math.random() * 0.3;
         }
 
@@ -575,19 +544,9 @@
           this.vx += Math.cos(this.wanderAngle) * WANDER_STRENGTH;
           this.vy += Math.sin(this.wanderAngle) * WANDER_STRENGTH;
 
-          // Zone tether — gentle pull back toward home Y band
-          const distFromHome = this.y - this.homeY;
-          if (Math.abs(distFromHome) > ZONE_DRIFT) {
-            // Stronger pull the further away from home zone
-            const pull = (distFromHome > 0 ? -1 : 1) * ZONE_PULL * (Math.abs(distFromHome) - ZONE_DRIFT);
-            this.vy += pull;
-          }
-
           // Flee from mouse
-          const mxPage = mouseX;
-          const myPage = mouseY;
-          const dmx = this.x - mxPage;
-          const dmy = this.y - myPage;
+          const dmx = this.x - mouseX;
+          const dmy = this.y - mouseY;
           const mouseDist = Math.sqrt(dmx * dmx + dmy * dmy);
           if (mouseDist < FLEE_RADIUS && mouseDist > 0) {
             const flee = (1 - mouseDist / FLEE_RADIUS) * FLEE_STRENGTH;
@@ -619,25 +578,17 @@
         }
 
         draw() {
-          // Only draw boids in/near the viewport
-          const scrollY = window.scrollY;
-          const viewTop = scrollY - 60;
-          const viewBottom = scrollY + window.innerHeight + 60;
-          if (this.y < viewTop || this.y > viewBottom) return;
-
-          const screenY = this.y - scrollY;
           ctx.beginPath();
-          ctx.arc(this.x, screenY, this.size, 0, Math.PI * 2);
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
           ctx.fillStyle = this.color;
           ctx.fill();
         }
       }
 
-      const boids = Array.from({ length: BOID_COUNT }, (_, i) => new Boid(i, BOID_COUNT));
+      const boids = Array.from({ length: BOID_COUNT }, () => new Boid());
 
       function tick() {
-        ctx.clearRect(0, 0, W, window.innerHeight);
-        canvas.height = window.innerHeight; // keep canvas viewport-sized for perf
+        ctx.clearRect(0, 0, W, H);
         for (const b of boids) b.update(boids);
         for (const b of boids) b.draw();
         requestAnimationFrame(tick);
