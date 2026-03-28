@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>פרוייקטים אדירים עם קלוד קוד</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design Tokens ─────────────────────────────────── */
+    :root {
+      --navy:     #182F4E;
+      --navy-dark:#0f1e31;
+      --cyan:     #39E0CE;
+      --magenta:  #EF00A3;
+      --bg:       #0b1929;
+      --white:    #FFFFFF;
+      --text:     #1a2d44;
+      --text-muted: #5a7080;
+      --shadow:   0 4px 20px rgba(24, 47, 78, 0.10);
+      --shadow-hover: 0 20px 50px rgba(24, 47, 78, 0.25);
+      --radius:   18px;
+      --transition: 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --font: 'Open Sans', Arial, sans-serif;
+    }
+
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      direction: rtl;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    a { text-decoration: none; color: inherit; }
+    img { display: block; }
+
+    /* ── Boid Canvas ───────────────────────────────────── */
+    #boid-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── Header / Hero (Glass) ────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, rgba(24,47,78,0.75) 0%, rgba(13,31,53,0.7) 55%, rgba(10,46,42,0.65) 100%);
+      backdrop-filter: blur(12px) saturate(1.2);
+      -webkit-backdrop-filter: blur(12px) saturate(1.2);
+      padding: 80px 40px 70px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      z-index: 2;
+      border-bottom: 1px solid rgba(57, 224, 206, 0.15);
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg,
+        rgba(57,224,206,0) 0%,
+        rgba(57,224,206,0.08) 50%,
+        rgba(57,224,206,0) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 6s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .hero-logo {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: rgba(57,224,206,0.6);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero-logo span { color: var(--cyan); }
+    .hero-title {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.25;
+      color: var(--white);
+      margin-bottom: 18px;
+    }
+    .hero-title .highlight { color: var(--cyan); }
+    .hero-subtitle {
+      font-size: 1.05rem;
+      color: rgba(57, 224, 206, 0.65);
+      font-weight: 400;
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* ── Main Grid ─────────────────────────────────────── */
+    .projects-section {
+      flex: 1;
+      max-width: 1240px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 56px 28px 64px;
+      position: relative;
+    }
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+
+    /* ── Card (Glassmorphism) ─────────────────────────── */
+    .card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(3px) saturate(1.2);
+      -webkit-backdrop-filter: blur(3px) saturate(1.2);
+      border-radius: var(--radius);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      position: relative;
+      z-index: 2;
+      opacity: 0;
+      transform: translateY(28px);
+      animation: cardIn 0.5s ease forwards;
+      transition:
+        box-shadow var(--transition),
+        border-color var(--transition),
+        background var(--transition);
+      /* 3D tilt setup */
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+    @keyframes cardIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Animated gradient border glow on hover */
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: calc(var(--radius) + 1px);
+      background: linear-gradient(135deg, var(--cyan), var(--magenta), var(--cyan), var(--magenta));
+      background-size: 300% 300%;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      animation: borderGlow 3s ease-in-out infinite;
+    }
+    @keyframes borderGlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .card:hover::before { opacity: 1; }
+
+    /* Magenta sweep bar */
+    .card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--magenta));
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform 0.4s var(--bounce);
+      border-radius: 0 0 2px 2px;
+      z-index: 2;
+    }
+    .card:hover {
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .card:hover::after { transform: scaleX(1); }
+
+    /* Card Image */
+    .card-image-wrap {
+      width: 100%;
+      height: 220px;
+      overflow: hidden;
+      position: relative;
+      background: rgba(24, 47, 78, 0.25);
+      flex-shrink: 0;
+    }
+    .card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.75;
+      transition: transform 0.5s var(--bounce), filter 0.4s ease, opacity 0.4s ease;
+    }
+    .card:hover .card-img {
+      transform: scale(1.08) rotate(0.5deg);
+      filter: brightness(1.05) saturate(1.1);
+      opacity: 0.88;
+    }
+
+    /* Gradient placeholder (for Twitter posts) */
+    .card-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      position: relative;
+      transition: filter 0.4s ease;
+    }
+    .card:hover .card-placeholder {
+      filter: brightness(1.15);
+    }
+    .card-placeholder .ph-icon {
+      flex-shrink: 0;
+      opacity: 0.9;
+      transition: transform 0.5s var(--bounce);
+    }
+    .card:hover .card-placeholder .ph-icon {
+      transform: rotate(-12deg) scale(1.15);
+    }
+    .card-placeholder .ph-handle {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.6);
+      font-family: monospace;
+      letter-spacing: 0.03em;
+      transition: transform 0.3s var(--bounce), color 0.3s;
+    }
+    .card:hover .card-placeholder .ph-handle {
+      color: rgba(255,255,255,0.9);
+      transform: translateY(4px);
+    }
+
+    /* Fallback for screenshot failures */
+    .card-img-fallback {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(24,47,78,0.5), rgba(26,58,92,0.4));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .card-img-fallback .favicon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+    }
+    .fallback-label {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.5);
+      font-weight: 600;
+    }
+
+    /* Card Body */
+    .card-body {
+      padding: 20px 20px 22px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      transition: background 0.3s ease;
+    }
+    .card:hover .card-body {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .type-badge {
+      flex-shrink: 0;
+      display: inline-block;
+      padding: 3px 11px;
+      border-radius: 50px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: var(--magenta);
+      color: var(--white);
+      letter-spacing: 0.02em;
+      transition: transform 0.4s var(--bounce), background 0.3s, color 0.3s;
+    }
+    .card:hover .type-badge {
+      transform: scale(1.12) rotate(-3deg);
+      background: rgba(57, 224, 206, 0.3);
+      color: var(--cyan);
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.4;
+      color: #111827;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+    .card:hover .card-title {
+      color: var(--white);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    }
+    .card-desc {
+      font-size: 0.875rem;
+      line-height: 1.65;
+      color: #4b5563;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      flex: 1;
+      transition: color 0.3s ease;
+    }
+    .card:hover .card-desc {
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .card-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      padding: 9px 18px;
+      border: 1.5px solid var(--navy);
+      border-radius: 10px;
+      color: var(--navy);
+      font-weight: 700;
+      font-size: 0.82rem;
+      background: rgba(24, 47, 78, 0.06);
+      transition: background 0.25s, color 0.25s, transform 0.3s var(--bounce), border-color 0.25s;
+      align-self: flex-start;
+    }
+    .card:hover .card-cta {
+      border-color: rgba(57, 224, 206, 0.5);
+      color: var(--cyan);
+      background: rgba(57, 224, 206, 0.1);
+    }
+    .card-cta:hover {
+      background: rgba(57, 224, 206, 0.3) !important;
+      color: var(--white) !important;
+      border-color: var(--cyan) !important;
+      transform: scale(1.06);
+    }
+    .card-cta .cta-arrow {
+      display: inline-block;
+      transition: transform 0.3s var(--bounce);
+    }
+    .card:hover .card-cta .cta-arrow {
+      animation: arrowBounce 0.6s var(--bounce) infinite alternate;
+    }
+    @keyframes arrowBounce {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-5px); }
+    }
+
+    /* ── Footer (Glass) ────────────────────────────────── */
+    footer {
+      background: rgba(15, 30, 49, 0.65);
+      backdrop-filter: blur(12px) saturate(1.2);
+      -webkit-backdrop-filter: blur(12px) saturate(1.2);
+      border-top: 1px solid rgba(57, 224, 206, 0.2);
+      text-align: center;
+      padding: 28px 24px;
+      position: relative;
+      z-index: 2;
+    }
+    footer p {
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.7;
+    }
+    footer a {
+      color: var(--magenta);
+      font-weight: 700;
+      transition: opacity 0.2s;
+    }
+    footer a:hover { opacity: 0.8; }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 920px) {
+      .projects-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+      .hero { padding: 60px 24px 52px; }
+    }
+    @media (max-width: 580px) {
+      .projects-grid { grid-template-columns: 1fr; gap: 16px; }
+      .projects-section { padding: 32px 16px 48px; }
+      .card-image-wrap { height: 190px; }
+      .hero { padding: 48px 20px 44px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Boid particle canvas -->
+  <canvas id="boid-canvas"></canvas>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-logo">by <span>LetsAI</span></div>
+    <h1 class="hero-title">
+      פרוייקטים <span class="highlight">אדירים</span> עם קלוד קוד
+    </h1>
+    <p class="hero-subtitle">
+      אוסף של פרויקטים מרהיבים שנבנו בעזרת Claude Code — מכלים ואפליקציות ועד ויזואליזציות ומחקר
+    </p>
+  </header>
+
+  <!-- Grid -->
+  <main class="projects-section">
+    <div class="projects-grid" id="projects-grid"></div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>נוצר על ידי <strong style="color:rgba(255,255,255,0.8)">בנג'י בודנר</strong> מ-<a href="https://letsai.co.il" target="_blank" rel="noopener">LetsAI</a> &nbsp;·&nbsp; 2025</p>
+  </footer>
+
+  <script>
+    // ═══════════════════════════════════════════════════════
+    //  BOID PARTICLE SYSTEM
+    // ═══════════════════════════════════════════════════════
+    (function() {
+      const canvas = document.getElementById('boid-canvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      let mouseX = -9999, mouseY = -9999;
+      const BOID_COUNT = 200;
+      const FLEE_RADIUS = 140;
+      const FLEE_STRENGTH = 1.8;
+      const MAX_SPEED = 0.9;          // much slower — gentle drift
+      const MIN_SPEED = 0.2;
+      const WANDER_STRENGTH = 0.02;   // tiny wander — mostly follow the flock
+
+      // Strong cohesion & alignment → organized flocking
+      const VISUAL_RANGE = 150;       // see neighbors from further away
+      const SEP_DIST = 20;
+      const COHESION = 0.006;         // 3× stronger pull toward flock center
+      const ALIGNMENT = 0.08;         // 2× stronger — match neighbors' direction
+      const SEPARATION = 0.05;
+
+      // Generate a unique color per boid — themed HSL
+      function randomBoidColor() {
+        const hueRanges = [
+          [160, 200],  // cyan-ish (weighted)
+          [160, 200],  // cyan-ish (weighted again for more cyan)
+          [300, 340],  // magenta-ish
+          [50, 70],    // golden accent
+        ];
+        const range = hueRanges[Math.floor(Math.random() * hueRanges.length)];
+        const hue = range[0] + Math.random() * (range[1] - range[0]);
+        const sat = 65 + Math.random() * 35;   // 65-100%
+        const lit = 45 + Math.random() * 25;    // 45-70%
+        const alpha = 0.4 + Math.random() * 0.4;  // 0.4-0.8 — visible on dark bg
+        return `hsla(${hue}, ${sat}%, ${lit}%, ${alpha})`;
+      }
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = document.documentElement.scrollHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // Recalculate canvas height on scroll (for dynamic content)
+      let resizeTimer;
+      window.addEventListener('scroll', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const newH = document.documentElement.scrollHeight;
+          if (Math.abs(newH - H) > 50) {
+            H = canvas.height = newH;
+          }
+        }, 200);
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY + window.scrollY;
+      });
+      document.addEventListener('mouseleave', () => {
+        mouseX = -9999;
+        mouseY = -9999;
+      });
+
+      class Boid {
+        constructor() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * H;
+          this.vx = (Math.random() - 0.5) * MAX_SPEED * 2;
+          this.vy = (Math.random() - 0.5) * MAX_SPEED * 2;
+          // Wider size range — from tiny specks to chunky dots
+          this.size = 1.5 + Math.random() * 4.5;
+          // Each boid gets its own unique color
+          this.color = randomBoidColor();
+          // Gentle wander angle — drifts slowly for organic movement
+          this.wanderAngle = Math.random() * Math.PI * 2;
+          this.wanderRate = 0.08 + Math.random() * 0.15; // slow wander drift
+          // Slight per-boid speed variation (tighter range)
+          this.speedMult = 0.85 + Math.random() * 0.3;
+        }
+
+        update(boids) {
+          let cx = 0, cy = 0, countC = 0;  // cohesion
+          let ax = 0, ay = 0, countA = 0;  // alignment
+          let sx = 0, sy = 0;              // separation
+
+          for (const other of boids) {
+            if (other === this) continue;
+            const dx = other.x - this.x;
+            const dy = other.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < VISUAL_RANGE) {
+              cx += other.x; cy += other.y; countC++;
+              ax += other.vx; ay += other.vy; countA++;
+              if (dist < SEP_DIST) {
+                sx -= dx / dist;
+                sy -= dy / dist;
+              }
+            }
+          }
+
+          if (countC > 0) {
+            cx = cx / countC - this.x;
+            cy = cy / countC - this.y;
+            this.vx += cx * COHESION;
+            this.vy += cy * COHESION;
+          }
+          if (countA > 0) {
+            ax /= countA; ay /= countA;
+            this.vx += (ax - this.vx) * ALIGNMENT;
+            this.vy += (ay - this.vy) * ALIGNMENT;
+          }
+          this.vx += sx * SEPARATION;
+          this.vy += sy * SEPARATION;
+
+          // Random wander force — gives organic, unpredictable drift
+          this.wanderAngle += (Math.random() - 0.5) * this.wanderRate;
+          this.vx += Math.cos(this.wanderAngle) * WANDER_STRENGTH;
+          this.vy += Math.sin(this.wanderAngle) * WANDER_STRENGTH;
+
+          // Flee from mouse
+          const mxPage = mouseX;
+          const myPage = mouseY;
+          const dmx = this.x - mxPage;
+          const dmy = this.y - myPage;
+          const mouseDist = Math.sqrt(dmx * dmx + dmy * dmy);
+          if (mouseDist < FLEE_RADIUS && mouseDist > 0) {
+            const flee = (1 - mouseDist / FLEE_RADIUS) * FLEE_STRENGTH;
+            this.vx += (dmx / mouseDist) * flee;
+            this.vy += (dmy / mouseDist) * flee;
+          }
+
+          // Clamp speed (with per-boid variation)
+          const myMax = MAX_SPEED * this.speedMult;
+          const myMin = MIN_SPEED * this.speedMult;
+          const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+          if (speed > myMax) {
+            this.vx = (this.vx / speed) * myMax;
+            this.vy = (this.vy / speed) * myMax;
+          } else if (speed < myMin && speed > 0) {
+            this.vx = (this.vx / speed) * myMin;
+            this.vy = (this.vy / speed) * myMin;
+          }
+
+          // Move
+          this.x += this.vx;
+          this.y += this.vy;
+
+          // Wrap around
+          if (this.x < 0) this.x += W;
+          if (this.x > W) this.x -= W;
+          if (this.y < 0) this.y += H;
+          if (this.y > H) this.y -= H;
+        }
+
+        draw() {
+          // Only draw boids in/near the viewport
+          const scrollY = window.scrollY;
+          const viewTop = scrollY - 60;
+          const viewBottom = scrollY + window.innerHeight + 60;
+          if (this.y < viewTop || this.y > viewBottom) return;
+
+          const screenY = this.y - scrollY;
+          ctx.beginPath();
+          ctx.arc(this.x, screenY, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = this.color;
+          ctx.fill();
+        }
+      }
+
+      const boids = Array.from({ length: BOID_COUNT }, () => new Boid());
+
+      function tick() {
+        ctx.clearRect(0, 0, W, window.innerHeight);
+        canvas.height = window.innerHeight; // keep canvas viewport-sized for perf
+        for (const b of boids) b.update(boids);
+        for (const b of boids) b.draw();
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+
+    // ═══════════════════════════════════════════════════════
+    //  3D TILT EFFECT
+    // ═══════════════════════════════════════════════════════
+    function initTilt() {
+      document.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const cx = rect.width / 2;
+          const cy = rect.height / 2;
+          const rotateY = ((x - cx) / cx) * 6;  // max 6deg
+          const rotateX = ((cy - y) / cy) * 6;
+          card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-8px) scale(1.02)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = '';
+        });
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  PROJECT DATA
+    // ═══════════════════════════════════════════════════════
+    // To add a new project: add one object to this array.
+    const PROJECTS = [
+      {
+        title: "AI אמנות ויזואלית עם קלוד קוד",
+        description: "פוסט ויראלי של האמן פאביאן סטלצר המדגים יצירת אמנות גנרטיבית ואינטראקטיבית מרהיבה בעזרת Claude Code.",
+        url: "https://x.com/fabianstelzer/status/2006014021527380343",
+        imageUrl: null,
+        type: "אמנות",
+        placeholderGradient: "linear-gradient(135deg, #182F4E 0%, #1a3a5c 50%, #39E0CE 100%)",
+        twitterHandle: "@fabianstelzer"
+      },
+      {
+        title: "ויזואליזציה אינטראקטיבית של רשת נוירונית",
+        description: "כלי אינטראקטיבי להדמיה תלת-ממדית של שכבת קונבולוציה (Conv2D) — שנו פרמטרים וראו את הפלט בזמן אמת.",
+        url: "https://bjbodner.github.io/dataScienceProjects/src/visualizations/interactive_conv2d.html",
+        imageUrl: "https://bjbodner.github.io/dataScienceProjects/src/visualizations/interactive_conv2d.html",
+        type: "ויזואליזציה",
+      },
+      {
+        title: "בניית פרויקט ראשון עם קלוד קוד",
+        description: "סוק סרוי משתף את חוויית השימוש הראשון ב-Claude Code ואת הקסם שגרם לו — בניית פרויקט שלם בדקות.",
+        url: "https://x.com/sukh_saroy/status/2036501664765714825",
+        imageUrl: null,
+        type: "השראה",
+        placeholderGradient: "linear-gradient(135deg, #0f1f35 0%, #EF00A3 65%, #182F4E 100%)",
+        twitterHandle: "@sukh_saroy"
+      },
+      {
+        title: "סטארטאפים של YC בונים עם קלוד קוד",
+        description: "פוסט רשמי של Anthropic המתאר כיצד חברות מואצת Y Combinator משתמשות ב-Claude Code לבניית מוצרים בקצב חסר תקדים.",
+        url: "https://claude.com/blog/building-companies-with-claude-code",
+        imageUrl: "https://claude.com/blog/building-companies-with-claude-code",
+        type: "מאמר",
+      },
+      {
+        title: "אתר פורטפוליו של AJ Kale",
+        description: "אתר אישי מרשים שנבנה עם Claude Code — עיצוב מודרני, ניווט חלק וחוויית משתמש ייחודית שמדברת בעד עצמה.",
+        url: "https://ajkale.com",
+        imageUrl: "https://ajkale.com",
+        type: "אתר",
+      },
+      {
+        title: "פלטפורמת Explore Claude Code",
+        description: "פלטפורמה מקיפה של לוק רנטון לחקר יכולות Claude Code, עם הדגמות חיות, מדריכים ומשאבים לקהילה.",
+        url: "https://www.exploreclaudecode.com",
+        imageUrl: "https://www.exploreclaudecode.com",
+        type: "פלטפורמה",
+      },
+      {
+        title: "בניית אפליקציה שלמה בשעה",
+        description: "CT Morley מדגים בפוסט ויראלי כיצד בנה אפליקציית ווב מלאה ופונקציונלית בשעה אחת בלבד בעזרת Claude Code.",
+        url: "https://x.com/ctmorley/status/2006799341734801420",
+        imageUrl: null,
+        type: "השראה",
+        placeholderGradient: "linear-gradient(135deg, #182F4E 0%, #2d1b4e 55%, #EF00A3 100%)",
+        twitterHandle: "@ctmorley"
+      },
+      {
+        title: "פיזיקאי בונה כלי מחקר",
+        description: "פיזיקאי ללא ניסיון קידוד משמעותי בונה כלים מדעיים מתוחכמים בעזרת Claude Code — עדות לכוח הדמוקרטיזציה של AI.",
+        url: "https://x.com/aphysicist/status/2005269379425149177",
+        imageUrl: null,
+        type: "מחקר",
+        placeholderGradient: "linear-gradient(135deg, #0a2440 0%, #39E0CE 55%, #182F4E 100%)",
+        twitterHandle: "@aphysicist"
+      },
+      {
+        title: "אוטומציה של זרימות עבודה",
+        description: "d33v33d0 מציג כיצד Claude Code שינה את זרימת העבודה שלו ואוטמט משימות שחוזרות על עצמן, חסך שעות עבודה יומיות.",
+        url: "https://x.com/d33v33d0/status/2006221407340867881",
+        imageUrl: null,
+        type: "אוטומציה",
+        placeholderGradient: "linear-gradient(135deg, #1a0a3a 0%, #EF00A3 45%, #39E0CE 100%)",
+        twitterHandle: "@d33v33d0"
+      },
+      {
+        title: "מחקר AI בעזרת קלוד קוד",
+        description: "יאם פלג, חוקר AI מוביל, מדגים כיצד Claude Code מאיץ ניסויים, אב-טיפוס מהיר ופיתוח מודלים בסדרי גודל חדשים.",
+        url: "https://x.com/Yampeleg/status/2000642897402880491",
+        imageUrl: null,
+        type: "מחקר",
+        placeholderGradient: "linear-gradient(135deg, #182F4E 0%, #0d3a2e 55%, #39E0CE 100%)",
+        twitterHandle: "@Yampeleg"
+      },
+      {
+        title: "Sound Mind Visualizer — PWA",
+        description: "אפליקציית פרוגרסיבית (PWA) להמחשה ויזואלית של צליל ומוזיקה בזמן אמת עם שילוב AI — נבנתה לחלוטין עם Claude Code.",
+        url: "https://smv.club/",
+        imageUrl: "https://smv.club/",
+        type: "אפליקציה",
+      },
+      {
+        title: "ניתוח נתונים עם Claude Code",
+        description: "מקס וולף, מהנדס ML מוביל, מציג ניתוחי נתונים מרשימים וויזואליזציות מתוחכמות שנבנו בסיוע Claude Code.",
+        url: "https://x.com/minimaxir/status/2005779586676842646",
+        imageUrl: null,
+        type: "ניתוח",
+        placeholderGradient: "linear-gradient(135deg, #3a0a2a 0%, #EF00A3 55%, #182F4E 100%)",
+        twitterHandle: "@minimaxir"
+      },
+      {
+        title: "ארגז כלים לפרודוקטיביות עם קלוד קוד",
+        description: "ריפוזיטורי GitHub עם אוסף כלים, סקריפטים ואינטגרציות (Google Docs, Sheets, ניהול סשנים) להגברת הפרודוקטיביות.",
+        url: "https://github.com/pchalasani/claude-code-tools/tree/main",
+        imageUrl: "https://github.com/pchalasani/claude-code-tools",
+        type: "גיטהאב",
+      },
+      {
+        title: "גלישה בהיסטוריית קלוד קוד",
+        description: "כלי שנבנה על ידי חבר קהילה לצפייה, מיון וחיפוש בכל שיחות Claude Code לפי נושא, תאריך ופרויקט.",
+        url: "https://www.reddit.com/r/ClaudeAI/comments/1q0zm9d/i_built_a_tool_to_browse_claude_code_history_by/",
+        imageUrl: "https://www.reddit.com/r/ClaudeAI/comments/1q0zm9d/",
+        type: "כלי",
+      },
+      {
+        title: "FullNotes — לוח לבן PDF ל-iOS",
+        description: "אפליקציית iOS לרישום הערות ועבודה עם PDF על לוח לבן אינסופי — פותחה בעזרת Claude Code ופורסמה ב-App Store.",
+        url: "https://apps.apple.com/us/app/fullnotes-pdf-whiteboard/id6477992713",
+        imageUrl: "https://apps.apple.com/us/app/fullnotes-pdf-whiteboard/id6477992713",
+        type: "אפליקציה",
+      },
+      {
+        title: "Benjy Fish — חנות אקווריום עם סימולציה",
+        description: "חנות דגי אקווריום עם סימולציית להקת דגים אינטראקטיבית מבוססת Boids — רקע אוקיינוס דינמי, תאורה לפי שעה ביום ואנימציות דגים ריאליסטיות.",
+        url: "https://bjbodner.github.io/fish_school/",
+        imageUrl: "https://bjbodner.github.io/fish_school/",
+        type: "סימולציה",
+      },
+      {
+        title: "TaskFlow — מנהל משימות עם גיימיפיקציה",
+        description: "אפליקציית ניהול משימות בעברית בסגנון קנבן עם מערכת XP, רמות, הישגים, סטריקים ואנימציית חיית מחמד — פרודוקטיביות כיפית.",
+        url: "https://bjbodner.github.io/task-manager-v2/",
+        imageUrl: "https://bjbodner.github.io/task-manager-v2/",
+        type: "אפליקציה",
+      }
+    ];
+
+    // ── Helpers ───────────────────────────────────────────
+    function thumbUrl(rawUrl) {
+      return `https://s.wordpress.com/mshots/v1/${encodeURIComponent(rawUrl)}?w=800&h=500`;
+    }
+
+    function hostname(url) {
+      try { return new URL(url).hostname; } catch { return ''; }
+    }
+
+    // ── SVG Icons ────────────────────────────────────────
+    const X_ICON = `<svg class="ph-icon" width="44" height="44" viewBox="0 0 24 24" fill="white" opacity="0.9">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>`;
+
+    const EXTERNAL_LINK_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+    </svg>`;
+
+    // ── Render ────────────────────────────────────────────
+    function renderProjects() {
+      const grid = document.getElementById('projects-grid');
+
+      PROJECTS.forEach((project, i) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.animationDelay = `${i * 0.06}s`;
+
+        let imageHtml;
+
+        if (project.imageUrl === null) {
+          // Twitter / X placeholder
+          imageHtml = `
+            <div class="card-placeholder" style="background: ${project.placeholderGradient}">
+              ${X_ICON}
+              <span class="ph-handle">${project.twitterHandle || ''}</span>
+            </div>`;
+        } else {
+          const src = thumbUrl(project.imageUrl);
+          const favicon = `https://www.google.com/s2/favicons?sz=64&domain=${hostname(project.imageUrl)}`;
+          imageHtml = `
+            <img
+              class="card-img"
+              src="${src}"
+              alt="${project.title}"
+              loading="lazy"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+            />
+            <div class="card-img-fallback" style="display:none;">
+              <img class="favicon" src="${favicon}" alt="" onerror="this.style.display='none'">
+              <span class="fallback-label">${project.type}</span>
+            </div>`;
+        }
+
+        card.innerHTML = `
+          <div class="card-image-wrap">
+            ${imageHtml}
+          </div>
+          <div class="card-body">
+            <div class="card-header-row">
+              <h3 class="card-title">${project.title}</h3>
+              <span class="type-badge">${project.type}</span>
+            </div>
+            <p class="card-desc">${project.description}</p>
+            <a class="card-cta" href="${project.url}" target="_blank" rel="noopener noreferrer">
+              לצפייה בפרויקט <span class="cta-arrow">${EXTERNAL_LINK_ICON}</span>
+            </a>
+          </div>`;
+
+        grid.appendChild(card);
+      });
+
+      // Init 3D tilt after cards are rendered
+      initTilt();
+    }
+
+    renderProjects();
+  </script>
+</body>
+</html>
